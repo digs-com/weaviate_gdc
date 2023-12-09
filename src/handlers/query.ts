@@ -97,7 +97,7 @@ async function executeQueryById(
               return [
                 alias,
                 response.properties![
-                  field.column as keyof typeof response.properties
+                field.column as keyof typeof response.properties
                 ],
               ];
             }
@@ -111,7 +111,7 @@ async function executeQueryById(
               return [
                 alias,
                 response.properties![
-                  field.field.column as keyof typeof response.properties
+                field.field.column as keyof typeof response.properties
                 ],
               ];
             }
@@ -149,11 +149,15 @@ async function executeSingleQuery(
   }
 
   if (query.where) {
-    const nearTextFilter = getNearTextFitler(query.where);
+    const searchTextFilter = getSearchTextFilter(query.where);
 
-    if (nearTextFilter.length > 0) {
+    if ((searchTextFilter.length > 0) && isNearTextFilter(query.where)) {
       getter.withNearText({
-        concepts: nearTextFilter,
+        concepts: searchTextFilter,
+      });
+    } else if ((searchTextFilter.length > 0) && isMatchTextFilter(query.where)) {
+      getter.withBm25({
+        query: searchTextFilter.toString(),
       });
     }
   }
@@ -200,7 +204,7 @@ async function executeSingleQuery(
         ) {
           const value =
             row[alias as keyof typeof row][
-              field.field.column as keyof typeof row
+            field.field.column as keyof typeof row
             ];
           return [alias, value];
         }
@@ -210,7 +214,7 @@ async function executeSingleQuery(
         ) {
           const value =
             row[alias as keyof typeof row][
-              field.relationship as keyof typeof row
+            field.relationship as keyof typeof row
             ];
           return [alias, value];
         }
@@ -223,32 +227,61 @@ async function executeSingleQuery(
   return { rows };
 }
 
-function getNearTextFitler(
+function isNearTextFilter(expression: Expression): boolean {
+  switch (expression.type) {
+    case "not":
+      return isNearTextFilter(expression.expression);
+    case "and":
+    case "or":
+      return expression.expressions.some(isNearTextFilter);
+    case "binary_op":
+      return expression.operator === "near_text";
+    default:
+      return false;
+  }
+}
+
+function isMatchTextFilter(expression: Expression): boolean {
+  switch (expression.type) {
+    case "not":
+      return isMatchTextFilter(expression.expression);
+    case "and":
+    case "or":
+      return expression.expressions.some(isMatchTextFilter);
+    case "binary_op":
+      return expression.operator === "match_text";
+    default:
+      return false;
+  }
+}
+
+function getSearchTextFilter(
   expression: Expression,
   negated = false,
   ored = false
 ): string[] {
   switch (expression.type) {
     case "not":
-      return getNearTextFitler(expression.expression, !negated, ored);
+      return getSearchTextFilter(expression.expression, !negated, ored);
     case "and":
       return expression.expressions
-        .map((expression) => getNearTextFitler(expression, negated, ored))
+        .map((expression) => getSearchTextFilter(expression, negated, ored))
         .flat()
         .filter((filter) => filter !== null);
     case "or":
       return expression.expressions
-        .map((expression) => getNearTextFitler(expression, negated, true))
+        .map((expression) => getSearchTextFilter(expression, negated, true))
         .flat()
         .filter((filter) => filter !== null);
     case "binary_op":
       switch (expression.operator) {
         case "near_text":
+        case "match_text":
           if (negated) {
-            throw new Error("Negated near_text not supported");
+            throw new Error("Negated near_text or match_text not supported");
           }
           if (ored) {
-            throw new Error("Ored near_text not supported");
+            throw new Error("Ored near_text or match_text not supported");
           }
           switch (expression.value.type) {
             case "scalar":
@@ -341,7 +374,8 @@ export function queryWhereOperator(
             ...expressionValue(expression.value),
           };
         case "near_text":
-          // silently ignore near_text operator
+        case "match_text":
+          // silently ignore near_text and match_text operator
           return null;
         default:
           throw new Error(
