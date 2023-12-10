@@ -15,10 +15,10 @@ export const getConfig = (request: FastifyRequest): Config => {
     : configHeader ?? "{}";
   const config = JSON.parse(rawConfigJson);
   return {
-    host: config.host,
-    scheme: config.scheme ?? "http",
-    apiKey: config.apiKey,
-    openApiKey: config.openApiKey,
+    host: process.env[config.host] ?? config.host,
+    scheme: process.env[config.scheme] ?? config.scheme ?? "http",
+    apiKey: process.env[config.apiKey] ?? config.apiKey,
+    openApiKey: process.env[config.openApiKey] ?? config.openApiKey,
   };
 };
 
@@ -28,22 +28,22 @@ export const configSchema: ConfigSchemaResponse = {
     nullable: false,
     properties: {
       scheme: {
-        description: "Weaviate connection scheme, defaults to http",
+        description: "Weaviate connection scheme or corresponding env var, defaults to http",
         type: "string",
         nullable: true,
       },
       host: {
-        description: "Weaviate host, including port",
+        description: "Weaviate host or corresponding env var, including port",
         type: "string",
         nullable: false,
       },
       apiKey: {
-        description: "Weaviate api key",
+        description: "Weaviate api key or corresponding env var",
         type: "string",
         nullable: false,
       },
       openApiKey: {
-        description: "Open Api key",
+        description: "OpenAI api key or corresponding env var",
         type: "string",
         nullable: false,
       },
