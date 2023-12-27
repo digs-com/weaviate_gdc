@@ -57,6 +57,7 @@ const scalarTypes: ScalarTypesCapabilities = {
       // ...getDefaultOperators("vector"),
       near_text: "text",
       match_text: "text",
+      hybrid_match_text: "text",
     },
   },
 };
