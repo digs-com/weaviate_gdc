@@ -15,10 +15,10 @@ export const getConfig = (request: FastifyRequest): Config => {
     : configHeader ?? "{}";
   const config = JSON.parse(rawConfigJson);
   return {
-    host: process.env[config.host] ?? config.host,
-    scheme: process.env[config.scheme] ?? config.scheme ?? "http",
-    apiKey: process.env[config.apiKey] ?? config.apiKey,
-    openApiKey: process.env[config.openApiKey] ?? config.openApiKey,
+    host: config.host,
+    scheme: config.scheme ?? "http",
+    apiKey: config.apiKey,
+    openApiKey: config.openApiKey,
   };
 };
 

@@ -151,16 +151,22 @@ async function executeSingleQuery(
   if (query.where) {
     const searchTextFilter = getSearchTextFilter(query.where);
 
-    if ((searchTextFilter.length > 0) && isNearTextFilter(query.where)) {
-      getter.withNearText({
-        concepts: searchTextFilter,
-      });
-    } else if ((searchTextFilter.length > 0) && isMatchTextFilter(query.where)) {
-      getter.withBm25({
-        query: searchTextFilter.toString(),
-      });
+    if (searchTextFilter.length > 0) {
+      if (isTextFilter(query.where, "near_text")) {
+        getter.withNearText({
+          concepts: searchTextFilter,
+        });
+      } else if (isTextFilter(query.where, "match_text")) {
+        getter.withBm25({
+          query: searchTextFilter.toString(),
+        });
+      } else if (isTextFilter(query.where, "hybrid_match_text")) {
+        getter.withHybrid({
+          query: searchTextFilter.toString(),
+        });
+      }
     }
-  }
+  } 
 
   if (forEachWhere) {
     if (query.where) {
@@ -227,33 +233,19 @@ async function executeSingleQuery(
   return { rows };
 }
 
-function isNearTextFilter(expression: Expression): boolean {
-  switch (expression.type) {
-    case "not":
-      return isNearTextFilter(expression.expression);
-    case "and":
-    case "or":
-      return expression.expressions.some(isNearTextFilter);
-    case "binary_op":
-      return expression.operator === "near_text";
-    default:
-      return false;
-  }
-}
-
-function isMatchTextFilter(expression: Expression): boolean {
-  switch (expression.type) {
-    case "not":
-      return isMatchTextFilter(expression.expression);
-    case "and":
-    case "or":
-      return expression.expressions.some(isMatchTextFilter);
-    case "binary_op":
-      return expression.operator === "match_text";
-    default:
-      return false;
-  }
-}
+function isTextFilter(expression: Expression, operator: string): boolean {  
+  switch (expression.type) {  
+    case "not":  
+      return isTextFilter(expression.expression, operator);  
+    case "and":  
+    case "or":  
+      return expression.expressions.some(expr => isTextFilter(expr, operator));  
+    case "binary_op":  
+      return expression.operator === operator;  
+    default:  
+      return false;  
+  }  
+}  
 
 function getSearchTextFilter(
   expression: Expression,
@@ -277,11 +269,16 @@ function getSearchTextFilter(
       switch (expression.operator) {
         case "near_text":
         case "match_text":
+        case "hybrid_match_text":
           if (negated) {
-            throw new Error("Negated near_text or match_text not supported");
+            throw new Error(
+              "Negated near_text or match_text or hybrid_match_text not supported"
+            );
           }
           if (ored) {
-            throw new Error("Ored near_text or match_text not supported");
+            throw new Error(
+              "Ored near_text or match_text or hybrid_match_text not supported"
+            );
           }
           switch (expression.value.type) {
             case "scalar":
@@ -375,6 +372,7 @@ export function queryWhereOperator(
           };
         case "near_text":
         case "match_text":
+        case "hybrid_match_text":
           // silently ignore near_text and match_text operator
           return null;
         default:
