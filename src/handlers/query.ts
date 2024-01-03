@@ -271,10 +271,14 @@ function getSearchTextFilter(
         case "match_text":
         case "hybrid_match_text":
           if (negated) {
-            throw new Error("Negated near_text or match_text not supported");
+            throw new Error(
+              "Negated near_text or match_text or hybrid_match_text not supported"
+            );
           }
           if (ored) {
-            throw new Error("Ored near_text or match_text not supported");
+            throw new Error(
+              "Ored near_text or match_text or hybrid_match_text not supported"
+            );
           }
           switch (expression.value.type) {
             case "scalar":
