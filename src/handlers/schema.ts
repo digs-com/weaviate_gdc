@@ -32,6 +32,18 @@ const builtInProperties: ColumnInfo[] = [
     // type: { element_type: "number", nullable: false, type: "array" },
     type: "vector",
   },
+  {
+    name: "score",
+    nullable: true,
+    insertable: true,
+    type: "real",
+  },
+  {
+    name: "explainScore",
+    nullable: true,
+    insertable: true,
+    type: "text",
+  },
 ];
 
 export const builtInPropertiesKeys = builtInProperties.map((p) => p.name);
