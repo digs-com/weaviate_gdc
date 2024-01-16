@@ -1,0 +1,8 @@
+version: '3.8'
+services:
+  weaviate-gdc:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8100:8100"

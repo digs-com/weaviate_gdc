@@ -22,3 +22,10 @@ Please note that this is only a prototype and may contain bugs, reliability, and
 ## Deploy to Hasura Cloud
 
 You can use the new [Hasura Data Connector Plugin](https://hasura.io/docs/latest/hasura-cli/connector-plugin/) for the Hasura CLI to deploy this connector to Hasura Cloud.
+
+## Development
+
+```
+docker compose -f docker-compose.dev.yaml
+docker compose -f docker-compose.dev.yaml up -d
+```
