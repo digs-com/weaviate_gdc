@@ -4,5 +4,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+      args:
+      - NODE_ENV=development
+    volumes:
+      - ./src:/app/src
     ports:
       - "8100:8100"
