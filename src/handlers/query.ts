@@ -150,7 +150,8 @@ async function executeSingleQuery(
 
   if (query.where) {
     const searchTextFilter = getSearchTextFilter(query.where);
-
+    const searchProps = queryProperties(query.where);
+    console.log("***** searchTextFilter *****", searchProps);
     if (searchTextFilter.length > 0) {
       if (isTextFilter(query.where, "near_text")) {
         getter.withNearText({
@@ -159,11 +160,25 @@ async function executeSingleQuery(
       } else if (isTextFilter(query.where, "match_text")) {
         getter.withBm25({
           query: searchTextFilter.toString(),
+          properties: searchProps,
         });
       } else if (isTextFilter(query.where, "hybrid_match_text")) {
         getter.withHybrid({
           query: searchTextFilter.toString(),
+          properties: searchProps,
         });
+      } else if(isTextFilter(query.where, "ask_question")) {
+        getter.withBm25({
+          query: searchTextFilter.toString(),
+          properties: searchProps,
+        });
+        // getter.withNearText({
+        //   concepts: searchTextFilter,
+        // });
+        // getter.withGenerate({
+        //   groupedTask: searchTextFilter.toString(),
+        // });
+        
       }
     }
   } 
@@ -186,10 +201,11 @@ async function executeSingleQuery(
   } else if (query.where) {
     const where = queryWhereOperator(query.where);
     if (where !== null) {
-      getter.withWhere(where);
+      if (where.operands && where.operands.length > 0) {
+        getter.withWhere(where);
+      }
     }
   }
-
   const response = await getter.do();
 
   const rows = response.data.Get[table].map((row: any) =>
@@ -270,14 +286,16 @@ function getSearchTextFilter(
         case "near_text":
         case "match_text":
         case "hybrid_match_text":
+        case "ask_question":
+        case "with_properties":
           if (negated) {
             throw new Error(
-              "Negated near_text or match_text or hybrid_match_text not supported"
+              "Negated near_text or match_text or hybrid_match_text or ask_question not supported"
             );
           }
           if (ored) {
             throw new Error(
-              "Ored near_text or match_text or hybrid_match_text not supported"
+              "Ored near_text or match_text or hybrid_match_text or ask_question not supported"
             );
           }
           switch (expression.value.type) {
@@ -292,6 +310,21 @@ function getSearchTextFilter(
     default:
       return [];
   }
+}
+
+export function queryProperties(expression: Expression): string[] | undefined {
+  if (expression.type === "and") {
+    for (let x of expression.expressions) {
+      if (
+        x.type === "binary_op" &&
+        x.operator === "with_properties" &&
+        x.value.type === "scalar"
+      ) {
+        return x.value.value?.split(",");
+      }
+    }
+  }
+  return undefined;
 }
 
 export function queryWhereOperator(
@@ -373,7 +406,9 @@ export function queryWhereOperator(
         case "near_text":
         case "match_text":
         case "hybrid_match_text":
-          // silently ignore near_text and match_text operator
+        case "ask_question":
+        case "with_properties":
+          // silently ignore near_tex, match_text, hybrid_match_text or ask_question operator
           return null;
         default:
           throw new Error(

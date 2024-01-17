@@ -44,6 +44,12 @@ const builtInProperties: ColumnInfo[] = [
     insertable: true,
     type: "text",
   },
+  {
+    name: "certainty",
+    nullable: true,
+    insertable: true,
+    type: "real",
+  }
 ];
 
 export const builtInPropertiesKeys = builtInProperties.map((p) => p.name);
