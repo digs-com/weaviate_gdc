@@ -151,7 +151,6 @@ async function executeSingleQuery(
   if (query.where) {
     const searchTextFilter = getSearchTextFilter(query.where);
     const searchProps = queryProperties(query.where);
-    console.log("***** searchTextFilter *****", searchProps);
     if (searchTextFilter.length > 0) {
       if (isTextFilter(query.where, "near_text")) {
         getter.withNearText({
