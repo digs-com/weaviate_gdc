@@ -167,17 +167,13 @@ async function executeSingleQuery(
           properties: searchProps,
         });
       } else if(isTextFilter(query.where, "ask_question")) {
-        getter.withBm25({
+        getter.withHybrid({
           query: searchTextFilter.toString(),
           properties: searchProps,
         });
-        // getter.withNearText({
-        //   concepts: searchTextFilter,
-        // });
-        // getter.withGenerate({
-        //   groupedTask: searchTextFilter.toString(),
-        // });
-        
+        getter.withGenerate({
+          groupedTask: searchTextFilter.toString(),
+        });
       }
     }
   } 
