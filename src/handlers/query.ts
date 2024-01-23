@@ -166,7 +166,7 @@ async function executeSingleQuery(
           query: searchTextFilter.toString(),
           properties: searchProps,
         });
-      } else if(isTextFilter(query.where, "ask_question")) {
+      } else if (isTextFilter(query.where, "ask_question")) {
         getter.withHybrid({
           query: searchTextFilter.toString(),
           properties: searchProps,
@@ -403,7 +403,7 @@ export function queryWhereOperator(
         case "hybrid_match_text":
         case "ask_question":
         case "with_properties":
-          // silently ignore near_tex, match_text, hybrid_match_text or ask_question operator
+          // silently ignore near_text, match_text, hybrid_match_text or ask_question operator
           return null;
         default:
           throw new Error(
