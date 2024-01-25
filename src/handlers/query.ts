@@ -210,8 +210,12 @@ async function executeSingleQuery(
           field.type === "column" &&
           builtInPropertiesKeys.includes(field.column)
         ) {
-          const value =
-            row[alias as keyof typeof row][field.column as keyof typeof row];
+          let value = null;
+          if (alias !== "generate") {
+            value = row[alias as keyof typeof row][field.column as keyof typeof row];
+          } else {
+            value = row["_additional"]["generate"];
+          }
           return [alias, value];
         }
         if (
@@ -527,6 +531,7 @@ function expressionScalarValue(value: ScalarValue) {
 function queryFieldsAsString(fields: Record<string, Field>): string {
   return Object.entries(fields)
     .map(([alias, field]) => {
+      if (alias === "generate") return "";
       return `${alias}: ${fieldString(field)}`;
     })
     .join(" ");
