@@ -129,6 +129,11 @@ async function executeSingleQuery(
   query: Query,
   config: Config
 ) {
+
+  if (query.aggregates) {
+    const aggregates = executeAggregateQuery(query, config, table);
+  }
+
   const getter = getWeaviateClient(config).graphql.get();
 
   getter.withClassName(table);
@@ -229,8 +234,27 @@ async function executeSingleQuery(
       })
     )
   );
+  if (query.aggregates) {
+    const aggregateCount = await executeAggregateQuery(query, config, table);
+    const aggregates = {
+      aggregate_count: {
+        [table]: aggregateCount,
+      }
+    };
+    return { rows, aggregates };
+  }
+  else {
+    return { rows };
+  }
+}
 
-  return { rows };
+async function executeAggregateQuery(query: Query, config: Config, table: string) {
+  const getter = getWeaviateClient(config).graphql.aggregate();
+  getter.withClassName(table);
+  getter.withFields('meta { count }')
+  const { data : { Aggregate } } = await getter.do();
+  const aggregateCount = Aggregate[table][0].meta.count;
+  return aggregateCount;
 }
 
 function isTextFilter(expression: Expression, operator: string): boolean {  
