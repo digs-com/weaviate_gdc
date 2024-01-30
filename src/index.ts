@@ -32,7 +32,7 @@ server.register(FastifyCors, {
 server.get<{ Reply: CapabilitiesResponse }>(
   "/capabilities",
   async (request, _response) => {
-    server.log.info(
+    server.log.debug(
       { headers: request.headers, query: request.body },
       "capabilities.request"
     );
@@ -41,7 +41,7 @@ server.get<{ Reply: CapabilitiesResponse }>(
 );
 
 server.get<{ Reply: SchemaResponse }>("/schema", async (request, _response) => {
-  server.log.info(
+  server.log.debug(
     { headers: request.headers, query: request.body },
     "schema.request"
   );
@@ -53,7 +53,7 @@ server.get<{ Reply: SchemaResponse }>("/schema", async (request, _response) => {
 server.post<{ Body: QueryRequest; Reply: QueryResponse }>(
   "/query",
   async (request, _response) => {
-    server.log.info(
+    server.log.debug(
       { headers: request.headers, query: request.body },
       "query.request"
     );
@@ -68,7 +68,7 @@ server.post<{ Body: QueryRequest; Reply: QueryResponse }>(
 server.post<{ Body: MutationRequest; Reply: MutationResponse }>(
   "/mutation",
   async (request, _response) => {
-    server.log.info(
+    server.log.debug(
       { headers: request.headers, query: request.body },
       "mutation.request"
     );
@@ -81,7 +81,7 @@ server.post<{ Body: MutationRequest; Reply: MutationResponse }>(
 );
 
 server.get("/health", async (request, response) => {
-  server.log.info(
+  server.log.debug(
     { headers: request.headers, query: request.body },
     "health.request"
   );
@@ -89,7 +89,7 @@ server.get("/health", async (request, response) => {
 });
 
 process.on("SIGINT", () => {
-  server.log.info("interrupted");
+  server.log.error("interrupted");
   process.exit(0);
 });
 

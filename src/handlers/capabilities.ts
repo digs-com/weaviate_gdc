@@ -58,8 +58,10 @@ const scalarTypes: ScalarTypesCapabilities = {
       near_text: "text",
       match_text: "text",
       hybrid_match_text: "text",
+      ask_question: "text",
+      with_properties: "text"
     },
-  },
+  }
 };
 
 const capabilities: Capabilities = {
