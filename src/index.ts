@@ -60,6 +60,7 @@ server.post<{ Body: QueryRequest; Reply: QueryResponse }>(
 
     const config = getConfig(request);
     const query = request.body;
+    console.log("query", JSON.stringify(query, null, 2));
     const response = await executeQuery(query, config);
     return response;
   }

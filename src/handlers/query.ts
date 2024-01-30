@@ -97,7 +97,7 @@ async function executeQueryById(
               return [
                 alias,
                 response.properties![
-                field.column as keyof typeof response.properties
+                  field.column as keyof typeof response.properties
                 ],
               ];
             }
@@ -111,7 +111,7 @@ async function executeQueryById(
               return [
                 alias,
                 response.properties![
-                field.field.column as keyof typeof response.properties
+                  field.field.column as keyof typeof response.properties
                 ],
               ];
             }
@@ -129,11 +129,6 @@ async function executeSingleQuery(
   query: Query,
   config: Config
 ) {
-
-  if (query.aggregates) {
-    const aggregates = executeAggregateQuery(query, config, table);
-  }
-
   const getter = getWeaviateClient(config).graphql.get();
 
   getter.withClassName(table);
@@ -155,7 +150,7 @@ async function executeSingleQuery(
 
   if (query.where) {
     const searchTextFilter = getSearchTextFilter(query.where);
-    const searchProps = queryProperties(query.where);
+    const searchProps = queryProperties(query.where, "with_properties");
     if (searchTextFilter.length > 0) {
       if (isTextFilter(query.where, "near_text")) {
         getter.withNearText({
@@ -181,7 +176,7 @@ async function executeSingleQuery(
         });
       }
     }
-  } 
+  }
 
   if (forEachWhere) {
     if (query.where) {
@@ -206,6 +201,7 @@ async function executeSingleQuery(
       }
     }
   }
+  console.log("getter*******", JSON.stringify(getter, null, 2));
   const response = await getter.do();
 
   const rows = response.data.Get[table].map((row: any) =>
@@ -217,7 +213,8 @@ async function executeSingleQuery(
         ) {
           let value = null;
           if (alias !== "generate") {
-            value = row[alias as keyof typeof row][field.column as keyof typeof row];
+            value =
+              row[alias as keyof typeof row][field.column as keyof typeof row];
           } else {
             value = row["_additional"]["generate"];
           }
@@ -230,7 +227,7 @@ async function executeSingleQuery(
         ) {
           const value =
             row[alias as keyof typeof row][
-            field.field.column as keyof typeof row
+              field.field.column as keyof typeof row
             ];
           return [alias, value];
         }
@@ -240,7 +237,7 @@ async function executeSingleQuery(
         ) {
           const value =
             row[alias as keyof typeof row][
-            field.relationship as keyof typeof row
+              field.relationship as keyof typeof row
             ];
           return [alias, value];
         }
@@ -249,42 +246,86 @@ async function executeSingleQuery(
       })
     )
   );
-  if (query.aggregates) {
-    const aggregateCount = await executeAggregateQuery(query, config, table);
-    const aggregates = {
-      aggregate_count: {
-        [table]: aggregateCount,
+  if (query.aggregates && query.where ) {
+
+    if (query.aggregates.aggregate_generate) {
+      const aggregates = {
+        aggregate_generate: {
+          [table]: response.data.Get[table][0].generate,
+        }
       }
-    };
-    return { rows, aggregates };
+      return { rows, aggregates };
+    }
+
+    const tableAggregates = await executeAggregateQuery(
+      query,
+      config,
+      table
+    );
+    if (query.aggregates.aggregate_count) {
+      const aggregates = {
+        aggregate_count: {
+          [table]: tableAggregates[0].meta.count,
+        }
+      }
+      return { rows, aggregates };
+    }
+    if (query.aggregates.aggregate_group_by_vector) {
+      const aggregates = {
+        aggregate_group_by_vector: {
+          [table]: tableAggregates,
+        },
+      };
+      return { rows, aggregates };
+    }
   }
-  else {
-    return { rows };
-  }
+  return { rows };
+
 }
 
-async function executeAggregateQuery(query: Query, config: Config, table: string) {
+async function executeAggregateQuery(
+  query: Query,
+  config: Config,
+  table: string
+) {
   const getter = getWeaviateClient(config).graphql.aggregate();
   getter.withClassName(table);
-  getter.withFields('meta { count }')
-  const { data : { Aggregate } } = await getter.do();
-  const aggregateCount = Aggregate[table][0].meta.count;
-  return aggregateCount;
+  getter.withFields("meta { count }");
+  //@ts-ignore
+  const groupByProps = queryProperties(query.where.expressions[0], "with_groupedby");
+  if (groupByProps && query.aggregates && query.aggregates.aggregate_group_by_vector) {
+    getter.withGroupBy(groupByProps);
+    getter.withFields("groupedBy { path value } meta { count }");
+  }
+  if (query.where) {
+    const where = queryWhereOperator(query.where);
+    if (where !== null) {
+      if (where.operands && where.operands.length > 0) {
+        getter.withWhere(where);
+      }
+    }
+  }
+  const {
+    data: { Aggregate },
+  } = await getter.do();
+  return Aggregate[table];
 }
 
-function isTextFilter(expression: Expression, operator: string): boolean {  
-  switch (expression.type) {  
-    case "not":  
-      return isTextFilter(expression.expression, operator);  
-    case "and":  
-    case "or":  
-      return expression.expressions.some(expr => isTextFilter(expr, operator));  
-    case "binary_op":  
-      return expression.operator === operator;  
-    default:  
-      return false;  
-  }  
-}  
+function isTextFilter(expression: Expression, operator: string): boolean {
+  switch (expression.type) {
+    case "not":
+      return isTextFilter(expression.expression, operator);
+    case "and":
+    case "or":
+      return expression.expressions.some((expr) =>
+        isTextFilter(expr, operator)
+      );
+    case "binary_op":
+      return expression.operator === operator;
+    default:
+      return false;
+  }
+}
 
 function getSearchTextFilter(
   expression: Expression,
@@ -311,6 +352,7 @@ function getSearchTextFilter(
         case "hybrid_match_text":
         case "ask_question":
         case "with_properties":
+        case "with_groupedby":
           if (negated) {
             throw new Error(
               "Negated near_text or match_text or hybrid_match_text or ask_question not supported"
@@ -335,12 +377,15 @@ function getSearchTextFilter(
   }
 }
 
-export function queryProperties(expression: Expression): string[] | undefined {
+export function queryProperties(
+  expression: Expression,
+  from_props: string
+): string[] | undefined {
   if (expression.type === "and") {
     for (let x of expression.expressions) {
       if (
         x.type === "binary_op" &&
-        x.operator === "with_properties" &&
+        x.operator === from_props &&
         x.value.type === "scalar"
       ) {
         return x.value.value?.split(",");
@@ -366,19 +411,28 @@ export function queryWhereOperator(
       };
     case "and":
       if (expression.expressions.length < 1) return null;
-      return {
-        operator: "And",
-        operands: expression.expressions.reduce<WhereFilter[]>(
-          (exprs: WhereFilter[], expression: Expression): WhereFilter[] => {
-            const expr = queryWhereOperator(expression, path);
-            if (expr !== null) {
-              exprs.push(expr);
+      const operands = expression.expressions.reduce<WhereFilter[] | null>(
+        (
+          exprs: WhereFilter[] | null,
+          expression: Expression
+        ): WhereFilter[] | null => {
+          const expr = queryWhereOperator(expression, path);
+          if (expr !== null) {
+            if (exprs === null) {
+              exprs = [];
             }
-            return exprs;
-          },
-          []
-        ),
-      };
+            exprs.push(expr);
+          }
+          return exprs;
+        },
+        null
+      );
+      return operands && operands.length > 0
+        ? {
+            operator: "And",
+            operands: operands,
+          }
+        : null;
     case "or":
       if (expression.expressions.length < 1) return null;
       return {
@@ -431,6 +485,7 @@ export function queryWhereOperator(
         case "hybrid_match_text":
         case "ask_question":
         case "with_properties":
+        case "with_groupedby":
           // silently ignore near_text, match_text, hybrid_match_text or ask_question operator
           return null;
         default:
@@ -555,7 +610,7 @@ function expressionScalarValue(value: ScalarValue) {
 function queryFieldsAsString(fields: Record<string, Field>): string {
   return Object.entries(fields)
     .map(([alias, field]) => {
-      if (alias === "generate") return "";
+      if (alias === "generate" || alias.includes("groupedBy")) return "";
       return `${alias}: ${fieldString(field)}`;
     })
     .join(" ");
