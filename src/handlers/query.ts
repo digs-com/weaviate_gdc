@@ -201,7 +201,6 @@ async function executeSingleQuery(
       }
     }
   }
-  console.log("getter*******", JSON.stringify(getter, null, 2));
   const response = await getter.do();
 
   const rows = response.data.Get[table].map((row: any) =>
@@ -247,15 +246,6 @@ async function executeSingleQuery(
     )
   );
   if (query.aggregates && query.where ) {
-
-    if (query.aggregates.aggregate_generate) {
-      const aggregates = {
-        aggregate_generate: {
-          [table]: response.data.Get[table][0].generate,
-        }
-      }
-      return { rows, aggregates };
-    }
 
     const tableAggregates = await executeAggregateQuery(
       query,

@@ -64,7 +64,6 @@ const scalarTypes: ScalarTypesCapabilities = {
     },
     aggregate_functions: {
       group_by: "text",
-      generate: "text"
     },
   },
 };

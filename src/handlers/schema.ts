@@ -49,6 +49,12 @@ const builtInProperties: ColumnInfo[] = [
     nullable: true,
     insertable: false,
     type: "real",
+  },
+  {
+    name: "generate",
+    nullable: true,
+    insertable: true,
+    type: "json",
   }
 ];
 
