@@ -214,7 +214,7 @@ async function executeSingleQuery(
           if (alias !== "generate") {
             value =
               row[alias as keyof typeof row][field.column as keyof typeof row];
-          } else {
+          } else if (alias === "generate") {
             value = row["_additional"]["generate"];
           }
           return [alias, value];
