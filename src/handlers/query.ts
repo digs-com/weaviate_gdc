@@ -130,13 +130,13 @@ async function executeSingleQuery(
   config: Config
 ) {
   const getter = getWeaviateClient(config).graphql.get();
-
+  let fieldsString = "";
   getter.withClassName(table);
 
   if (query.fields) {
     // const additionalFields = query.query.fields.filter()
     // todo: filter out additional properties into the _additional field.
-    const fieldsString = queryFieldsAsString(query.fields);
+    fieldsString = queryFieldsAsString(query.fields);
     getter.withFields(fieldsString);
   }
 
@@ -179,10 +179,11 @@ async function executeSingleQuery(
           question: searchTextFilter.toString(),
           properties: searchProps,
         });
-        getter.withFields(
-          "_additional {  }"
+        // we have to add this additional string to the fields to get the answer
+        fieldsString = fieldsString.concat(
+          " _additional { answer { hasAnswer property result startPosition endPosition } }"
         );
-        getter.withLimit(1);
+        getter.withFields(fieldsString);
       }
     }
   }
@@ -220,11 +221,15 @@ async function executeSingleQuery(
           builtInPropertiesKeys.includes(field.column)
         ) {
           let value = null;
-          if (alias !== "generate") {
+          if (alias === "generate" || alias === "answer") {
+            if (!row["_additional"]) { // triggered when using plain get queries
+              value = null 
+            } else { 
+              value = row["_additional"][alias] 
+            }
+          } else {
             value =
               row[alias as keyof typeof row][field.column as keyof typeof row];
-          } else if (alias === "generate" || alias === "answer") {
-            value = row["_additional"][alias];
           }
           return [alias, value];
         }
@@ -628,7 +633,6 @@ function fieldString(field: Field): string {
       return field.relationship;
     case "column":
       if (builtInPropertiesKeys.includes(field.column)) {
-        if (field.column === "answer") return `_additional { answer { hasAnswer property result startPosition endPosition } }`;
         return `_additional { ${field.column} }`;
       }
       return field.column;
