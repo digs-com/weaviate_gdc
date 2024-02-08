@@ -97,7 +97,7 @@ async function executeQueryById(
               return [
                 alias,
                 response.properties![
-                field.column as keyof typeof response.properties
+                  field.column as keyof typeof response.properties
                 ],
               ];
             }
@@ -111,7 +111,7 @@ async function executeQueryById(
               return [
                 alias,
                 response.properties![
-                field.field.column as keyof typeof response.properties
+                  field.field.column as keyof typeof response.properties
                 ],
               ];
             }
@@ -129,19 +129,14 @@ async function executeSingleQuery(
   query: Query,
   config: Config
 ) {
-
-  if (query.aggregates) {
-    const aggregates = executeAggregateQuery(query, config, table);
-  }
-
   const getter = getWeaviateClient(config).graphql.get();
-
+  let fieldsString = "";
   getter.withClassName(table);
 
   if (query.fields) {
     // const additionalFields = query.query.fields.filter()
     // todo: filter out additional properties into the _additional field.
-    const fieldsString = queryFieldsAsString(query.fields);
+    fieldsString = queryFieldsAsString(query.fields);
     getter.withFields(fieldsString);
   }
 
@@ -155,8 +150,13 @@ async function executeSingleQuery(
 
   if (query.where) {
     const searchTextFilter = getSearchTextFilter(query.where);
-    const searchProps = queryProperties(query.where);
+    const searchProps = queryProperties(query.where, "with_properties");
+    const autocut = queryProperties(query.where, "autocut");
+
     if (searchTextFilter.length > 0) {
+      if (autocut) {
+        getter.withAutocut(autocut[0] as unknown as number);
+      }
       if (isTextFilter(query.where, "near_text")) {
         getter.withNearText({
           concepts: searchTextFilter,
@@ -171,7 +171,7 @@ async function executeSingleQuery(
           query: searchTextFilter.toString(),
           properties: searchProps,
         });
-      } else if (isTextFilter(query.where, "ask_question")) {
+      } else if (isTextFilter(query.where, "generative_search")) {
         getter.withHybrid({
           query: searchTextFilter.toString(),
           properties: searchProps,
@@ -179,9 +179,19 @@ async function executeSingleQuery(
         getter.withGenerate({
           groupedTask: searchTextFilter.toString(),
         });
+      } else if (isTextFilter(query.where, "ask_question")) {
+        getter.withAsk({
+          question: searchTextFilter.toString(),
+          properties: searchProps,
+        });
+        // we have to add this additional string to the fields to get the answer
+        fieldsString = fieldsString.concat(
+          " _additional { answer { hasAnswer property result startPosition endPosition } }"
+        );
+        getter.withFields(fieldsString);
       }
     }
-  } 
+  }
 
   if (forEachWhere) {
     if (query.where) {
@@ -216,10 +226,15 @@ async function executeSingleQuery(
           builtInPropertiesKeys.includes(field.column)
         ) {
           let value = null;
-          if (alias !== "generate") {
-            value = row[alias as keyof typeof row][field.column as keyof typeof row];
+          if (alias === "generate" || alias === "answer") {
+            if (!row["_additional"]) { // triggered when using plain get queries
+              value = null 
+            } else { 
+              value = row["_additional"][alias] 
+            }
           } else {
-            value = row["_additional"]["generate"];
+            value =
+              row[alias as keyof typeof row][field.column as keyof typeof row];
           }
           return [alias, value];
         }
@@ -230,7 +245,7 @@ async function executeSingleQuery(
         ) {
           const value =
             row[alias as keyof typeof row][
-            field.field.column as keyof typeof row
+              field.field.column as keyof typeof row
             ];
           return [alias, value];
         }
@@ -240,7 +255,7 @@ async function executeSingleQuery(
         ) {
           const value =
             row[alias as keyof typeof row][
-            field.relationship as keyof typeof row
+              field.relationship as keyof typeof row
             ];
           return [alias, value];
         }
@@ -250,41 +265,74 @@ async function executeSingleQuery(
     )
   );
   if (query.aggregates) {
-    const aggregateCount = await executeAggregateQuery(query, config, table);
-    const aggregates = {
-      aggregate_count: {
-        [table]: aggregateCount,
+    const tableAggregates = await executeAggregateQuery(
+      query,
+      config,
+      table
+    );
+    if (query.aggregates.aggregate_count) {
+      const aggregates = {
+        aggregate_count: {
+          [table]: tableAggregates[0].meta.count,
+        }
       }
-    };
-    return { rows, aggregates };
+      return { rows, aggregates };
+    }
+    if (query.aggregates.aggregate_group_by_vector) {
+      const aggregates = {
+        aggregate_group_by_vector: {
+          [table]: tableAggregates,
+        },
+      };
+      return { rows, aggregates };
+    }
   }
-  else {
-    return { rows };
-  }
+  return { rows };
 }
 
-async function executeAggregateQuery(query: Query, config: Config, table: string) {
+async function executeAggregateQuery(
+  query: Query,
+  config: Config,
+  table: string
+) {
   const getter = getWeaviateClient(config).graphql.aggregate();
   getter.withClassName(table);
-  getter.withFields('meta { count }')
-  const { data : { Aggregate } } = await getter.do();
-  const aggregateCount = Aggregate[table][0].meta.count;
-  return aggregateCount;
+  getter.withFields("meta { count }");
+  //@ts-ignore
+  const groupByProps = queryProperties(query.where.expressions[0], "with_groupedby");
+  if (groupByProps && query.aggregates && query.aggregates.aggregate_group_by_vector) {
+    getter.withGroupBy(groupByProps);
+    getter.withFields("groupedBy { path value } meta { count }");
+  }
+  if (query.where) {
+    const where = queryWhereOperator(query.where);
+    if (where !== null) {
+      if (where.operands && where.operands.length > 0) {
+        getter.withWhere(where);
+      }
+    }
+  }
+  const {
+    data: { Aggregate },
+  } = await getter.do();
+  return Aggregate[table];
 }
 
-function isTextFilter(expression: Expression, operator: string): boolean {  
-  switch (expression.type) {  
-    case "not":  
-      return isTextFilter(expression.expression, operator);  
-    case "and":  
-    case "or":  
-      return expression.expressions.some(expr => isTextFilter(expr, operator));  
-    case "binary_op":  
-      return expression.operator === operator;  
-    default:  
-      return false;  
-  }  
-}  
+function isTextFilter(expression: Expression, operator: string): boolean {
+  switch (expression.type) {
+    case "not":
+      return isTextFilter(expression.expression, operator);
+    case "and":
+    case "or":
+      return expression.expressions.some((expr) =>
+        isTextFilter(expr, operator)
+      );
+    case "binary_op":
+      return expression.operator === operator;
+    default:
+      return false;
+  }
+}
 
 function getSearchTextFilter(
   expression: Expression,
@@ -310,15 +358,18 @@ function getSearchTextFilter(
         case "match_text":
         case "hybrid_match_text":
         case "ask_question":
+        case "generative_search":
         case "with_properties":
+        case "with_groupedby":
+        case "autocut":
           if (negated) {
             throw new Error(
-              "Negated near_text or match_text or hybrid_match_text or ask_question not supported"
+              "Negated near_text or match_text or hybrid_match_text or ask_question or generative search or autocut not supported"
             );
           }
           if (ored) {
             throw new Error(
-              "Ored near_text or match_text or hybrid_match_text or ask_question not supported"
+              "Ored near_text or match_text or hybrid_match_text or ask_question or generative search or autocut not supported"
             );
           }
           switch (expression.value.type) {
@@ -335,12 +386,15 @@ function getSearchTextFilter(
   }
 }
 
-export function queryProperties(expression: Expression): string[] | undefined {
+export function queryProperties(
+  expression: Expression,
+  from_props: string
+): string[] | undefined {
   if (expression.type === "and") {
     for (let x of expression.expressions) {
       if (
         x.type === "binary_op" &&
-        x.operator === "with_properties" &&
+        x.operator === from_props &&
         x.value.type === "scalar"
       ) {
         return x.value.value?.split(",");
@@ -361,24 +415,33 @@ export function queryWhereOperator(
         return null;
       }
       return {
-        operator: "Not",
+        operator: "NotEqual",
         operands: [expr],
       };
     case "and":
       if (expression.expressions.length < 1) return null;
-      return {
-        operator: "And",
-        operands: expression.expressions.reduce<WhereFilter[]>(
-          (exprs: WhereFilter[], expression: Expression): WhereFilter[] => {
-            const expr = queryWhereOperator(expression, path);
-            if (expr !== null) {
-              exprs.push(expr);
+      const operands = expression.expressions.reduce<WhereFilter[] | null>(
+        (
+          exprs: WhereFilter[] | null,
+          expression: Expression
+        ): WhereFilter[] | null => {
+          const expr = queryWhereOperator(expression, path);
+          if (expr !== null) {
+            if (exprs === null) {
+              exprs = [];
             }
-            return exprs;
-          },
-          []
-        ),
-      };
+            exprs.push(expr);
+          }
+          return exprs;
+        },
+        null
+      );
+      return operands && operands.length > 0
+        ? {
+            operator: "And",
+            operands: operands,
+          }
+        : null;
     case "or":
       if (expression.expressions.length < 1) return null;
       return {
@@ -430,8 +493,11 @@ export function queryWhereOperator(
         case "match_text":
         case "hybrid_match_text":
         case "ask_question":
+        case "generative_search":
         case "with_properties":
-          // silently ignore near_text, match_text, hybrid_match_text or ask_question operator
+        case "with_groupedby":
+        case "autocut":
+          // silently ignore near_text, match_text, hybrid_match_text or ask_question or generative search or autocut operator
           return null;
         default:
           throw new Error(
@@ -555,7 +621,7 @@ function expressionScalarValue(value: ScalarValue) {
 function queryFieldsAsString(fields: Record<string, Field>): string {
   return Object.entries(fields)
     .map(([alias, field]) => {
-      if (alias === "generate") return "";
+      if (alias === "generate" || alias.includes("groupedBy") || alias === "answer") return "";
       return `${alias}: ${fieldString(field)}`;
     })
     .join(" ");
