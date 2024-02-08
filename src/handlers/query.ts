@@ -264,8 +264,7 @@ async function executeSingleQuery(
       })
     )
   );
-  if (query.aggregates && query.where ) {
-
+  if (query.aggregates) {
     const tableAggregates = await executeAggregateQuery(
       query,
       config,
@@ -289,7 +288,6 @@ async function executeSingleQuery(
     }
   }
   return { rows };
-
 }
 
 async function executeAggregateQuery(
