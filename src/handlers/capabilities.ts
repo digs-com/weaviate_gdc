@@ -59,8 +59,10 @@ const scalarTypes: ScalarTypesCapabilities = {
       match_text: "text",
       hybrid_match_text: "text",
       ask_question: "text",
+      generative_search: "text",
       with_properties: "text",
       with_groupedby: "text",
+      autocut: "text"
     },
     aggregate_functions: {
       group_by: "text",

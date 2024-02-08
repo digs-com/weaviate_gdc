@@ -130,13 +130,13 @@ async function executeSingleQuery(
   config: Config
 ) {
   const getter = getWeaviateClient(config).graphql.get();
-
+  let fieldsString = "";
   getter.withClassName(table);
 
   if (query.fields) {
     // const additionalFields = query.query.fields.filter()
     // todo: filter out additional properties into the _additional field.
-    const fieldsString = queryFieldsAsString(query.fields);
+    fieldsString = queryFieldsAsString(query.fields);
     getter.withFields(fieldsString);
   }
 
@@ -151,7 +151,12 @@ async function executeSingleQuery(
   if (query.where) {
     const searchTextFilter = getSearchTextFilter(query.where);
     const searchProps = queryProperties(query.where, "with_properties");
+    const autocut = queryProperties(query.where, "autocut");
+
     if (searchTextFilter.length > 0) {
+      if (autocut) {
+        getter.withAutocut(autocut[0] as unknown as number);
+      }
       if (isTextFilter(query.where, "near_text")) {
         getter.withNearText({
           concepts: searchTextFilter,
@@ -166,7 +171,7 @@ async function executeSingleQuery(
           query: searchTextFilter.toString(),
           properties: searchProps,
         });
-      } else if (isTextFilter(query.where, "ask_question")) {
+      } else if (isTextFilter(query.where, "generative_search")) {
         getter.withHybrid({
           query: searchTextFilter.toString(),
           properties: searchProps,
@@ -174,6 +179,16 @@ async function executeSingleQuery(
         getter.withGenerate({
           groupedTask: searchTextFilter.toString(),
         });
+      } else if (isTextFilter(query.where, "ask_question")) {
+        getter.withAsk({
+          question: searchTextFilter.toString(),
+          properties: searchProps,
+        });
+        // we have to add this additional string to the fields to get the answer
+        fieldsString = fieldsString.concat(
+          " _additional { answer { hasAnswer property result startPosition endPosition } }"
+        );
+        getter.withFields(fieldsString);
       }
     }
   }
@@ -211,11 +226,15 @@ async function executeSingleQuery(
           builtInPropertiesKeys.includes(field.column)
         ) {
           let value = null;
-          if (alias !== "generate") {
+          if (alias === "generate" || alias === "answer") {
+            if (!row["_additional"]) { // triggered when using plain get queries
+              value = null 
+            } else { 
+              value = row["_additional"][alias] 
+            }
+          } else {
             value =
               row[alias as keyof typeof row][field.column as keyof typeof row];
-          } else if (alias === "generate") {
-            value = row["_additional"]["generate"];
           }
           return [alias, value];
         }
@@ -341,16 +360,18 @@ function getSearchTextFilter(
         case "match_text":
         case "hybrid_match_text":
         case "ask_question":
+        case "generative_search":
         case "with_properties":
         case "with_groupedby":
+        case "autocut":
           if (negated) {
             throw new Error(
-              "Negated near_text or match_text or hybrid_match_text or ask_question not supported"
+              "Negated near_text or match_text or hybrid_match_text or ask_question or generative search or autocut not supported"
             );
           }
           if (ored) {
             throw new Error(
-              "Ored near_text or match_text or hybrid_match_text or ask_question not supported"
+              "Ored near_text or match_text or hybrid_match_text or ask_question or generative search or autocut not supported"
             );
           }
           switch (expression.value.type) {
@@ -396,7 +417,7 @@ export function queryWhereOperator(
         return null;
       }
       return {
-        operator: "Not",
+        operator: "NotEqual",
         operands: [expr],
       };
     case "and":
@@ -474,9 +495,11 @@ export function queryWhereOperator(
         case "match_text":
         case "hybrid_match_text":
         case "ask_question":
+        case "generative_search":
         case "with_properties":
         case "with_groupedby":
-          // silently ignore near_text, match_text, hybrid_match_text or ask_question operator
+        case "autocut":
+          // silently ignore near_text, match_text, hybrid_match_text or ask_question or generative search or autocut operator
           return null;
         default:
           throw new Error(
@@ -600,7 +623,7 @@ function expressionScalarValue(value: ScalarValue) {
 function queryFieldsAsString(fields: Record<string, Field>): string {
   return Object.entries(fields)
     .map(([alias, field]) => {
-      if (alias === "generate" || alias.includes("groupedBy")) return "";
+      if (alias === "generate" || alias.includes("groupedBy") || alias === "answer") return "";
       return `${alias}: ${fieldString(field)}`;
     })
     .join(" ");

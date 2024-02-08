@@ -1,12 +1,9 @@
 import {
   MutationRequest,
   MutationResponse,
-  QueryRequest,
-  QueryResponse,
 } from "@hasura/dc-api-types";
 import { Config } from "../config";
 import { getWeaviateClient } from "../weaviate";
-import def from "ajv/dist/vocabularies/discriminator";
 import { builtInPropertiesKeys } from "./schema";
 import { queryWhereOperator } from "./query";
 
@@ -45,7 +42,7 @@ export async function executeMutation(
         // todo: something with the response?
         const insertResponse = await creator.do();
 
-        console.log("insert response", JSON.stringify(insertResponse));
+        // console.log("insert response", JSON.stringify(insertResponse));
 
         // todo: handle returning fields, based on insert response.
 
@@ -70,7 +67,7 @@ export async function executeMutation(
 
         const deleteResponse = await deleter.do();
 
-        console.log("delete response", deleteResponse);
+        // console.log("delete response", deleteResponse);
 
         response.operation_results.push({
           affected_rows: deleteResponse.results?.matches!,

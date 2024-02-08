@@ -53,9 +53,15 @@ const builtInProperties: ColumnInfo[] = [
   {
     name: "generate",
     nullable: true,
-    insertable: true,
+    insertable: false,
     type: "json",
-  }
+  },
+  {
+    name: "answer",
+    nullable: true,
+    insertable: false,
+    type: "json",
+  },
 ];
 
 export const builtInPropertiesKeys = builtInProperties.map((p) => p.name);
