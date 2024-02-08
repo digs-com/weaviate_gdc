@@ -62,6 +62,7 @@ const scalarTypes: ScalarTypesCapabilities = {
       generative_search: "text",
       with_properties: "text",
       with_groupedby: "text",
+      autocut: "text"
     },
     aggregate_functions: {
       group_by: "text",
