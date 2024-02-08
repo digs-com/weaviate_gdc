@@ -151,7 +151,12 @@ async function executeSingleQuery(
   if (query.where) {
     const searchTextFilter = getSearchTextFilter(query.where);
     const searchProps = queryProperties(query.where, "with_properties");
+    const autocut = queryProperties(query.where, "autocut");
+
     if (searchTextFilter.length > 0) {
+      if (autocut) {
+        getter.withAutocut(autocut[0] as unknown as number);
+      }
       if (isTextFilter(query.where, "near_text")) {
         getter.withNearText({
           concepts: searchTextFilter,
@@ -358,14 +363,15 @@ function getSearchTextFilter(
         case "generative_search":
         case "with_properties":
         case "with_groupedby":
+        case "autocut":
           if (negated) {
             throw new Error(
-              "Negated near_text or match_text or hybrid_match_text or ask_question or generative search not supported"
+              "Negated near_text or match_text or hybrid_match_text or ask_question or generative search or autocut not supported"
             );
           }
           if (ored) {
             throw new Error(
-              "Ored near_text or match_text or hybrid_match_text or ask_question or generative search not supported"
+              "Ored near_text or match_text or hybrid_match_text or ask_question or generative search or autocut not supported"
             );
           }
           switch (expression.value.type) {
@@ -411,7 +417,7 @@ export function queryWhereOperator(
         return null;
       }
       return {
-        operator: "Not",
+        operator: "NotEqual",
         operands: [expr],
       };
     case "and":
@@ -492,7 +498,8 @@ export function queryWhereOperator(
         case "generative_search":
         case "with_properties":
         case "with_groupedby":
-          // silently ignore near_text, match_text, hybrid_match_text or ask_question or generative search operator
+        case "autocut":
+          // silently ignore near_text, match_text, hybrid_match_text or ask_question or generative search or autocut operator
           return null;
         default:
           throw new Error(
