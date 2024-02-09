@@ -186,7 +186,9 @@ async function executeSingleQuery(
   } else if (query.where) {
     const where = queryWhereOperator(query.where);
     if (where !== null) {
-      getter.withWhere(where);
+       if (where.operands && where.operands.length > 0) {
+         getter.withWhere(where);
+       }
     }
   }
 
