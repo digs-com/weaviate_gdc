@@ -1,18 +1,19 @@
-﻿import Fastify from "fastify";
-import FastifyCors from "@fastify/cors";
-import { getConfig } from "./config";
+﻿import FastifyCors from "@fastify/cors";
 import {
   CapabilitiesResponse,
-  SchemaResponse,
-  QueryRequest,
-  QueryResponse,
   MutationRequest,
   MutationResponse,
+  QueryRequest,
+  QueryResponse,
+  SchemaResponse,
 } from "@hasura/dc-api-types";
+import Fastify from "fastify";
+import { getConfig } from "./config";
 import { getCapabilities } from "./handlers/capabilities";
-import { getSchema } from "./handlers/schema";
-import { executeQuery } from "./handlers/query";
 import { executeMutation } from "./handlers/mutation";
+import { executeQuery } from "./handlers/query";
+import { getSchema } from "./handlers/schema";
+import { log } from "./logger";
 
 const port = Number(process.env.PORT) || 8100;
 const server = Fastify({ logger: { transport: { target: "pino-pretty" } } });
@@ -32,19 +33,13 @@ server.register(FastifyCors, {
 server.get<{ Reply: CapabilitiesResponse }>(
   "/capabilities",
   async (request, _response) => {
-    server.log.debug(
-      { headers: request.headers, query: request.body },
-      "capabilities.request"
-    );
+    log.debug("capabilities request", { headers: request.headers, query: request.body });
     return getCapabilities();
   }
 );
 
 server.get<{ Reply: SchemaResponse }>("/schema", async (request, _response) => {
-  server.log.debug(
-    { headers: request.headers, query: request.body },
-    "schema.request"
-  );
+  log.debug("schema request", { headers: request.headers, query: request.body });
   const config = getConfig(request);
   const schema = await getSchema(config);
   return schema;
@@ -53,10 +48,7 @@ server.get<{ Reply: SchemaResponse }>("/schema", async (request, _response) => {
 server.post<{ Body: QueryRequest; Reply: QueryResponse }>(
   "/query",
   async (request, _response) => {
-    server.log.debug(
-      { headers: request.headers, query: request.body },
-      "query.request"
-    );
+    log.debug("query request", { headers: request.headers, query: request.body });
 
     const config = getConfig(request);
     const query = request.body;
@@ -68,10 +60,7 @@ server.post<{ Body: QueryRequest; Reply: QueryResponse }>(
 server.post<{ Body: MutationRequest; Reply: MutationResponse }>(
   "/mutation",
   async (request, _response) => {
-    server.log.debug(
-      { headers: request.headers, query: request.body },
-      "mutation.request"
-    );
+    log.debug("mutation request", { headers: request.headers, query: request.body });
 
     const config = getConfig(request);
     const mutation = request.body;
@@ -81,15 +70,12 @@ server.post<{ Body: MutationRequest; Reply: MutationResponse }>(
 );
 
 server.get("/health", async (request, response) => {
-  server.log.debug(
-    { headers: request.headers, query: request.body },
-    "health.request"
-  );
+  log.debug("health check", { headers: request.headers, query: request.body });
   response.statusCode = 204;
 });
 
 process.on("SIGINT", () => {
-  server.log.error("interrupted");
+  log.error("server interrupted");
   process.exit(0);
 });
 
@@ -97,7 +83,7 @@ const start = async () => {
   try {
     await server.listen({ port: port, host: "0.0.0.0" });
   } catch (err) {
-    server.log.fatal(err);
+    log.error("server failed to start", err);
     process.exit(1);
   }
 };

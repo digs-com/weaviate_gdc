@@ -23,15 +23,19 @@
   "dependencies": {
     "@fastify/cors": "^8.1.0",
     "@hasura/dc-api-types": "0.41.0",
+    "ansis": "^3.2.0",
+    "date-fns": "^3.6.0",
     "fastify": "^4.13.0",
     "mathjs": "^11.0.0",
     "pino-pretty": "^8.0.0",
     "weaviate-ts-client": "^1.6.0",
+    "whatwg-fetch": "^3.6.20",
     "xml2js": "github:Leonidas-from-XIV/node-xml2js"
   },
   "devDependencies": {
     "@tsconfig/node16": "^1.0.3",
     "@types/node": "^16.11.49",
+    "@types/whatwg-fetch": "^0.0.33",
     "@types/xml2js": "^0.4.11",
     "ts-node": "^10.9.1",
     "typescript": "^4.7.4"
