@@ -16,7 +16,7 @@ import { getSchema } from "./handlers/schema";
 import { log } from "./logger";
 
 const port = Number(process.env.PORT) || 8100;
-const server = Fastify({ logger: { transport: { target: "pino-pretty" } } });
+const server = Fastify({ logger: false });
 
 server.register(FastifyCors, {
   // Accept all origins of requests. This must be modified in
@@ -33,13 +33,12 @@ server.register(FastifyCors, {
 server.get<{ Reply: CapabilitiesResponse }>(
   "/capabilities",
   async (request, _response) => {
-    log.debug("capabilities request", { headers: request.headers, query: request.body });
+    const config = getConfig(request);
     return getCapabilities();
   }
 );
 
 server.get<{ Reply: SchemaResponse }>("/schema", async (request, _response) => {
-  log.debug("schema request", { headers: request.headers, query: request.body });
   const config = getConfig(request);
   const schema = await getSchema(config);
   return schema;
@@ -48,8 +47,6 @@ server.get<{ Reply: SchemaResponse }>("/schema", async (request, _response) => {
 server.post<{ Body: QueryRequest; Reply: QueryResponse }>(
   "/query",
   async (request, _response) => {
-    log.debug("query request", { headers: request.headers, query: request.body });
-
     const config = getConfig(request);
     const query = request.body;
     const response = await executeQuery(query, config);
@@ -60,8 +57,6 @@ server.post<{ Body: QueryRequest; Reply: QueryResponse }>(
 server.post<{ Body: MutationRequest; Reply: MutationResponse }>(
   "/mutation",
   async (request, _response) => {
-    log.debug("mutation request", { headers: request.headers, query: request.body });
-
     const config = getConfig(request);
     const mutation = request.body;
     const response = await executeMutation(mutation, config);

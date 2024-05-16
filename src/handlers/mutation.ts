@@ -57,6 +57,7 @@ export async function executeMutation(
 
         break;
       case "update":
+        log.error("update not implemented");
         throw new Error("update not implemented");
       case "delete":
         const deleter = getWeaviateClient(config)

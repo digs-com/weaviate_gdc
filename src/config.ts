@@ -6,6 +6,7 @@ export type Config = {
   host: string;
   apiKey: string;
   openApiKey: string;
+  digsEnv: string;
 };
 
 export const getConfig = (request: FastifyRequest): Config => {
@@ -14,11 +15,14 @@ export const getConfig = (request: FastifyRequest): Config => {
     ? configHeader[0]
     : configHeader ?? "{}";
   const config = JSON.parse(rawConfigJson);
+  // TODO: hack to make the env var available to the logger. fix this later
+  process.env["NEXT_PUBLIC_DIGS_ENV"] = config.digsEnv;
   return {
     host: config.host,
     scheme: config.scheme ?? "http",
     apiKey: config.apiKey,
     openApiKey: config.openApiKey,
+    digsEnv: config.digsEnv,
   };
 };
 
@@ -28,7 +32,8 @@ export const configSchema: ConfigSchemaResponse = {
     nullable: false,
     properties: {
       scheme: {
-        description: "Weaviate connection scheme or corresponding env var, defaults to http",
+        description:
+          "Weaviate connection scheme or corresponding env var, defaults to http",
         type: "string",
         nullable: true,
       },
@@ -44,6 +49,11 @@ export const configSchema: ConfigSchemaResponse = {
       },
       openApiKey: {
         description: "OpenAI api key or corresponding env var",
+        type: "string",
+        nullable: false,
+      },
+      digsEnv: {
+        description: "Environment name",
         type: "string",
         nullable: false,
       },

@@ -6,10 +6,13 @@ import { DataDogTransport } from "./datadog_transport";
 const isConsoleEnabled =
   process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
 
-const isDataDogEnabled =
-  !!process.env.DATADOG_API_KEY &&
-  !!process.env.NEXT_PUBLIC_DIGS_ENV &&
-  !!(process.env.DATADOG_SERVER_LOGGER_ENABLED === "true");
+function isDataDogEnabled(): boolean {
+  return (
+    !!process.env.DATADOG_API_KEY &&
+    !!process.env.NEXT_PUBLIC_DIGS_ENV &&
+    !!(process.env.DATADOG_SERVER_LOGGER_ENABLED === "true")
+  );
+}
 
 class Logger {
   readonly dataDogTransport = new DataDogTransport();
@@ -39,7 +42,7 @@ class Logger {
         ...this.getConsoleArgs(context)
       );
     }
-    if (isDataDogEnabled) {
+    if (isDataDogEnabled()) {
       return this.dataDogTransport.info(message, context);
     }
   }
@@ -53,7 +56,7 @@ class Logger {
         ...this.getConsoleArgs(context)
       );
     }
-    if (isDataDogEnabled) {
+    if (isDataDogEnabled()) {
       return this.dataDogTransport.debug(message, context);
     }
   }
@@ -67,7 +70,7 @@ class Logger {
         ...this.getConsoleArgs(context)
       );
     }
-    if (isDataDogEnabled) {
+    if (isDataDogEnabled()) {
       return this.dataDogTransport.warn(message, context);
     }
   }
@@ -86,7 +89,7 @@ class Logger {
         ...this.getConsoleArgs(maybeContextOrError)
       );
     }
-    if (isDataDogEnabled) {
+    if (isDataDogEnabled()) {
       return this.dataDogTransport.error(message, maybeContextOrError);
     }
   }
