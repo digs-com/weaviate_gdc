@@ -1,21 +1,23 @@
-﻿import Fastify from "fastify";
-import FastifyCors from "@fastify/cors";
-import { getConfig } from "./config";
+﻿import FastifyCors from "@fastify/cors";
 import {
   CapabilitiesResponse,
-  SchemaResponse,
-  QueryRequest,
-  QueryResponse,
   MutationRequest,
   MutationResponse,
+  QueryRequest,
+  QueryResponse,
+  SchemaResponse,
 } from "@hasura/dc-api-types";
+import Fastify from "fastify";
+import Configuration from "./config";
 import { getCapabilities } from "./handlers/capabilities";
-import { getSchema } from "./handlers/schema";
-import { executeQuery } from "./handlers/query";
 import { executeMutation } from "./handlers/mutation";
+import { executeQuery } from "./handlers/query";
+import { getSchema } from "./handlers/schema";
+import { log } from "./logger";
 
 const port = Number(process.env.PORT) || 8100;
-const server = Fastify({ logger: { transport: { target: "pino-pretty" } } });
+const server = Fastify({ logger: false });
+const config = Configuration.getInstance();
 
 server.register(FastifyCors, {
   // Accept all origins of requests. This must be modified in
@@ -29,38 +31,28 @@ server.register(FastifyCors, {
   ],
 });
 
+server.addHook("preHandler", async (request, _reply) => {
+  config.setConfig(request);
+});
+
 server.get<{ Reply: CapabilitiesResponse }>(
   "/capabilities",
   async (request, _response) => {
-    server.log.debug(
-      { headers: request.headers, query: request.body },
-      "capabilities.request"
-    );
     return getCapabilities();
   }
 );
 
 server.get<{ Reply: SchemaResponse }>("/schema", async (request, _response) => {
-  server.log.debug(
-    { headers: request.headers, query: request.body },
-    "schema.request"
-  );
-  const config = getConfig(request);
-  const schema = await getSchema(config);
+  const schema = await getSchema(config.getConfig());
   return schema;
 });
 
 server.post<{ Body: QueryRequest; Reply: QueryResponse }>(
   "/query",
   async (request, _response) => {
-    server.log.debug(
-      { headers: request.headers, query: request.body },
-      "query.request"
-    );
-
-    const config = getConfig(request);
+    log.info("query initiated");
     const query = request.body;
-    const response = await executeQuery(query, config);
+    const response = await executeQuery(query, config.getConfig());
     return response;
   }
 );
@@ -68,28 +60,19 @@ server.post<{ Body: QueryRequest; Reply: QueryResponse }>(
 server.post<{ Body: MutationRequest; Reply: MutationResponse }>(
   "/mutation",
   async (request, _response) => {
-    server.log.debug(
-      { headers: request.headers, query: request.body },
-      "mutation.request"
-    );
-
-    const config = getConfig(request);
     const mutation = request.body;
-    const response = await executeMutation(mutation, config);
+    const response = await executeMutation(mutation, config.getConfig());
     return response;
   }
 );
 
 server.get("/health", async (request, response) => {
-  server.log.debug(
-    { headers: request.headers, query: request.body },
-    "health.request"
-  );
+  log.debug("health check", { headers: request.headers, query: request.body });
   response.statusCode = 204;
 });
 
 process.on("SIGINT", () => {
-  server.log.error("interrupted");
+  log.error("server interrupted");
   process.exit(0);
 });
 
@@ -97,7 +80,7 @@ const start = async () => {
   try {
     await server.listen({ port: port, host: "0.0.0.0" });
   } catch (err) {
-    server.log.fatal(err);
+    log.error("server failed to start", err);
     process.exit(1);
   }
 };
