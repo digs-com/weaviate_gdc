@@ -1,5 +1,5 @@
-import type { LogLevel } from "./log_levels";
 import Configuration from "../config";
+import type { LogLevel } from "./log_levels";
 
 export class DataDogTransport {
   readonly apiUrl = `https://http-intake.logs.datadoghq.com/api/v2/logs?dd-api-key=${process.env.DATADOG_API_KEY}`;
