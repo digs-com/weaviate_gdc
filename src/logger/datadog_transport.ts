@@ -1,3 +1,4 @@
+import Configuration from "../config";
 import type { LogLevel } from "./log_levels";
 
 export class DataDogTransport {
@@ -6,10 +7,11 @@ export class DataDogTransport {
   constructor() {}
 
   async send(level: LogLevel, message: string, maybeContextOrError?: any) {
+    const config = Configuration.getInstance();
     const isError = maybeContextOrError instanceof Error;
     const postBody = {
       level,
-      ddtags: `env:${process.env.NEXT_PUBLIC_DIGS_ENV},status:${level}`,
+      ddtags: `env:${config.getConfig().digsEnv},status:${level}`,
       message,
       service: "digs-gdc",
       ddsource: "hasura-weaviate-gdc",
