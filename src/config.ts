@@ -2,29 +2,49 @@ import { FastifyRequest } from "fastify";
 import { ConfigSchemaResponse } from "@hasura/dc-api-types";
 
 export type Config = {
-  scheme: string;
-  host: string;
-  apiKey: string;
-  openApiKey: string;
-  digsEnv: string;
+  scheme?: string;
+  host?: string;
+  apiKey?: string;
+  openApiKey?: string;
+  digsEnv?: string;
 };
 
-export const getConfig = (request: FastifyRequest): Config => {
-  const configHeader = request.headers["x-hasura-dataconnector-config"];
-  const rawConfigJson = Array.isArray(configHeader)
-    ? configHeader[0]
-    : configHeader ?? "{}";
-  const config = JSON.parse(rawConfigJson);
-  // TODO: hack to make the env var available to the logger. fix this later
-  process.env["NEXT_PUBLIC_DIGS_ENV"] = config.digsEnv;
-  return {
-    host: config.host,
-    scheme: config.scheme ?? "http",
-    apiKey: config.apiKey,
-    openApiKey: config.openApiKey,
-    digsEnv: config.digsEnv,
-  };
-};
+class Configuration {
+  private static instance: Configuration;
+  private config: Config;
+
+  constructor() {
+    this.config = {};
+  }
+
+  public static getInstance(): Configuration {
+    if (!Configuration.instance) {
+      Configuration.instance = new Configuration();
+    }
+    return Configuration.instance;
+  }
+
+  public setConfig(request: FastifyRequest): void {
+    const configHeader = request.headers["x-hasura-dataconnector-config"];
+    const rawConfigJson = Array.isArray(configHeader)
+      ? configHeader[0]
+      : configHeader ?? "{}";
+    const config = JSON.parse(rawConfigJson);
+    this.config = {
+      host: config.host,
+      scheme: config.scheme ?? "http",
+      apiKey: config.apiKey,
+      openApiKey: config.openApiKey,
+      digsEnv: config.digsEnv,
+    };
+  }
+
+  public getConfig(): Config {
+    return this.config;
+  }
+}
+
+export default Configuration;
 
 export const configSchema: ConfigSchemaResponse = {
   config_schema: {

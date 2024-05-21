@@ -36,6 +36,7 @@ export class DataDogTransport {
   }
 
   async info(message: string, context?: object) {
+    console.info("send it");
     return this.send("info", message, context);
   }
 

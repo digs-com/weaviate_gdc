@@ -1,18 +1,20 @@
+import { cyan, green, hex, red, yellow } from "ansis";
 import { format } from "date-fns";
-import { cyan, green, red, yellow, hex } from "ansis";
-import { boldIfSafe, getFileAndLineNumber } from "./utils";
+import Configuration from "../config";
 import { DataDogTransport } from "./datadog_transport";
+import { boldIfSafe, getFileAndLineNumber } from "./utils";
 
 const isConsoleEnabled =
   process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
 
-function isDataDogEnabled(): boolean {
+const isDataDogEnabled = (): boolean => {
+  const config = Configuration.getInstance();
   return (
     !!process.env.DATADOG_API_KEY &&
-    !!process.env.NEXT_PUBLIC_DIGS_ENV &&
+    !!config.getConfig().digsEnv &&
     !!(process.env.DATADOG_SERVER_LOGGER_ENABLED === "true")
   );
-}
+};
 
 class Logger {
   readonly dataDogTransport = new DataDogTransport();
